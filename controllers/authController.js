@@ -1,7 +1,7 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
+import crypto from "crypto";
 
 // register
 export const userCreate = async (req, res) => {
@@ -124,5 +124,121 @@ export const refreshToken = async (req, res) => {
     return res.sendStatus(200);
   } catch (err) {
     return res.sendStatus(403);
+  }
+};
+
+// Me
+export const Me = async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    const user = await User.findById(userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    res.status(200).json({
+      user: {
+        isLogin: true,
+        email: user.email,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ msg: err?.message || "Server Error" });
+  }
+};
+
+// Log Out
+export const Logout = async (req, res) => {
+  try {
+    res.clearCookie("authToken", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    res.status(200).json({
+      msg: "Logged out successfully",
+      isLogout: true,
+    });
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+
+// forgot password
+export const forgotPassword = async (req,res) => {
+  try {
+    const { email } = await req.body;
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({msg : "User not found"})
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+
+    user.resetPasswordToken = token;
+    user.resetPasswordExpire = new Date(Date.now() + 1000 * 60 * 15);
+    await user.save();
+
+    const resetLink = `${ process.env.NODE_ENV === "development"
+    ? process.env.LOCAL_BASE_URL
+    : process.env.PUBLIC_BASE_URL}/Client/Auth/ResetPassword/${token}`;
+
+    await sendMail(
+      email,
+      "Reset Password",
+      `<p>Click here to reset: <a href="${resetLink}">Reset</a></p>`,
+    );
+
+    return res.status(200).json({      
+      success: true,
+      msg: "Reset Password Send to your Email"
+    })
+  } catch (err) {
+    res.status(500).json({msg : err?.message || "Something went wrong"})
+  }
+};
+
+// reset password
+export const resetPassword = async (req,res) => {
+  try {
+    const { token, password } = await req.body;
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(404).json({msg : "User not found"})
+    }
+
+    const hasedPassword = await bcrypt.hash(password, 10);
+
+    user.password = hasedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+
+    return res.status(200).json({      
+      success: true,
+      msg: "Password Reserted Successfully"
+    })
+  } catch (err) {
+    res.status(500).json({msg : err?.message || "something went wrong"})
   }
 };

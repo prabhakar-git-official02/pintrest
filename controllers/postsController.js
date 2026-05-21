@@ -1,154 +1,229 @@
-import Posts from "../models/postsModel";
+import Posts from "../models/postsModel.js";
 
-// create Post
+// Create Post
 export const createPost = async (req, res) => {
   try {
-
-    const postdata = req.body;
-
     const userId = req.userId;
 
-    console.log(req.userId);
-
     if (!userId) {
-      return res.status(409).json({ msg: "User not logged" });
+      return res.status(401).json({
+        success: false,
+        msg: "User not authenticated",
+      });
     }
 
+    const { postImage, description, save, like, comment } = req.body;
 
-    const userPost = await Posts.create({
-      userId: req.userId,
-      ...postdata,
+    if (!postImage) {
+      return res.status(400).json({
+        success: false,
+        msg: "Post image is required",
+      });
+    }
+
+    const newPost = await Posts.create({
+      userId,
+      postImage,
+      description,
+      save,
+      like,
+      comment,
     });
 
-    res.status(201).json({ msg: "Post Created" });
+    res.status(201).json({
+      success: true,
+      msg: "Post created successfully",
+      data: newPost,
+    });
   } catch (err) {
-    res.status(500).json({ msg: err?.message });
+    res.status(500).json({
+      success: false,
+      msg: err.message,
+    });
   }
 };
 
-// update post
+// Update Post
 export const updatePost = async (req, res) => {
   try {
-    const {id} = req.params
-    const postObj = {};
-    let isValid = false;
+    const { id } = req.params;
 
-    const fields = [
-        "postImage",
-        "description",
-        "save",
-        "like",
-        "commend"
+    const allowedFields = [
+      "postImage",
+      "description",
+      "save",
+      "like",
+      "comment",
     ];
 
-    fields?.forEach((field) => {
+    const updateObj = {};
+
+    allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
-        postObj[field] = req.body[field];
-        isValid = true;
+        updateObj[field] = req.body[field];
       }
     });
 
+    if (Object.keys(updateObj).length === 0) {
+      return res.status(400).json({
+        success: false,
+        msg: "No valid fields provided",
+      });
+    }
+
     const existPost = await Posts.findById(id);
 
     if (!existPost) {
-      return res.status(401).json({ msg: "Post not found" });
+      return res.status(404).json({
+        success: false,
+        msg: "Post not found",
+      });
     }
 
-    if (!isValid) {
-      return res.status(400).json({ msg: "Invalid Field" });
-    }
-
-    const update = await Posts.findByIdAndUpdate(
+    const updatedPost = await Posts.findByIdAndUpdate(
       id,
-      { $set: postObj },
+      { $set: updateObj },
       { new: true },
-      { upsert: true },
     );
 
-    res.status(200).json({ msg: "Post Updated", data: update });
+    res.status(200).json({
+      success: true,
+      msg: "Post updated successfully",
+      data: updatedPost,
+    });
   } catch (err) {
-    res.status(500).json({ msg: err?.message });
+    res.status(500).json({
+      success: false,
+      msg: err.message,
+    });
   }
 };
 
-
-// delete Post field
+// Delete Particular field
 export const deletePostField = async (req, res) => {
   try {
-    const data = req.body;
-    const {id} = req.params
+    const { id } = req.params;
+
+    const fields = Object.keys(req.body);
+
+    if (fields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        msg: "Provide field name to delete",
+      });
+    }
 
     const existPost = await Posts.findById(id);
 
     if (!existPost) {
-      return res.status(401).json({ msg: "Post not found" });
+      return res.status(404).json({
+        success: false,
+        msg: "Post not found",
+      });
     }
 
-    const updateddata = await UserProfile.findByIdAndUpdate(
-       id,
-      { $unset: data },
+    const unsetObj = {};
+
+    fields.forEach((field) => {
+      unsetObj[field] = "";
+    });
+
+    const updatedPost = await Posts.findByIdAndUpdate(
+      id,
+      { $unset: unsetObj },
       { new: true },
     );
 
-    res.status(200).json({ msg: "Post Field deleted" });
+    res.status(200).json({
+      success: true,
+      msg: "Post field deleted successfully",
+      data: updatedPost,
+    });
   } catch (err) {
-    res.status(500).json({ msg: err?.message });
+    res.status(500).json({
+      success: false,
+      msg: err.message,
+    });
   }
 };
 
-// delete Post 
-export const deletePost = async(req,res) => {
-    try{
-        const {id} = req.params
+// Delete Post
+export const deletePost = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-        const existPost = await Posts.findById(id)
+    const existPost = await Posts.findById(id);
 
-        if(!existPost){
-            return res.status(404).json({msg : "Post not found"})
-        }
-
-        await Posts.findByIdAndDelete(id)
-
-        res.status(200).json({msg : "Post Deleted"})
-    }catch(err){
-        res.status(500).json({msg : err?.message})
+    if (!existPost) {
+      return res.status(404).json({
+        success: false,
+        msg: "Post not found",
+      });
     }
-}
 
-// get post by id 
-export const getpost = async(req,res) => {
-    try{
-        const {id} = req.params
+    await Posts.findByIdAndDelete(id);
 
-        const existPost = await Posts.findById(id)
+    res.status(200).json({
+      success: true,
+      msg: "Post deleted successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      msg: err.message,
+    });
+  }
+};
 
-        if(!existPost){
-            return res.status(404).json({msg : "Post not found"})
-        }
+// get single post
+export const getPost = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-        const post = await Posts.findById(id)
+    const post = await Posts.findById(id);
 
-        res.status(200).json({data : post})
-    }catch(err){
-        res.status(500).json({msg : err?.message})
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        msg: "Post not found",
+      });
     }
-}
 
-// get all post
-export const getAllpost = async(req,res) => {
-    try{
+    res.status(200).json({
+      success: true,
+      data: post,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      msg: err.message,
+    });
+  }
+};
 
-        const userid = req.userId
+// get all posts
+export const getAllPost = async (req, res) => {
+  try {
+    const userId = req.userId;
 
-        const existuser = await Posts.findOne({userId : userid})
+    const posts = await Posts.find({ userId });
 
-        if(!existuser){
-            return res.status(404).json({msg : "Posts not found"})
-        }
-        const post = await Posts.find(id)
-
-        res.status(200).json({data : post})
-    }catch(err){
-        res.status(500).json({msg : err?.message})
+    if (posts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        msg: "No posts found",
+      });
     }
-}
+
+    res.status(200).json({
+      success: true,
+      totalPosts: posts.length,
+      data: posts,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      msg: err.message,
+    });
+  }
+};

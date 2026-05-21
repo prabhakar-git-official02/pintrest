@@ -10,7 +10,7 @@ import multerRoute from "./routes/multerRoute.js"
 const app = express();
 
 app.use(cors({
-  origin : "http://localhost:3000",
+  origin : process.env.FROND_LOCAL_URL,
   credentials : true
 }));
 
