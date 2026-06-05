@@ -12,6 +12,7 @@ A scalable backend API for a Pinterest-style social media application built with
 * Mongoose
 * JWT Authentication
 * Multer
+* Nodemailer
 * Bcrypt
 * Crypto
 
